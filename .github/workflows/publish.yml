@@ -16,8 +16,7 @@ on:
   workflow_dispatch:
 
 env:
-  DENO_VERSION: "2.9.1"
-  DOCKER_CLI_VERSION: "29.6.1"
+  VERSION: "1.0.0"
 
 jobs:
   build-and-push:
@@ -43,29 +42,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image name and tags
+      - name: Compute image name
         id: meta
         run: |
           REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="ghcr.io/${REPO_LC}"
-          VERSION_TAG="deno-${DENO_VERSION}-dockercli-${DOCKER_CLI_VERSION}"
-          {
-            echo "image=${IMAGE}"
-            echo "version_tag=${VERSION_TAG}"
-          } >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version already published
+        id: check
+        if: github.event_name != 'pull_request'
+        run: |
+          if docker manifest inspect "${{ steps.meta.outputs.image }}:${VERSION}" > /dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is already published; skipping push."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} is not published yet; will build and push."
+          fi
 
       - name: Build and push
+        if: github.event_name == 'pull_request' || steps.check.outputs.already_published != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            DENO_VERSION=${{ env.DENO_VERSION }}
-            DOCKER_CLI_VERSION=${{ env.DOCKER_CLI_VERSION }}
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version_tag }}
+            ${{ steps.meta.outputs.image }}:${{ env.VERSION }}
             ${{ steps.meta.outputs.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
