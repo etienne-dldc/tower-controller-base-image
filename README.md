@@ -21,6 +21,7 @@ ghcr.io/etienne-dldc/tower-controller-base-image
 - **Docker CLI** (`docker-ce-cli`) so `docker` commands issued from inside the container talk to the
   host daemon when `/var/run/docker.sock` is bind-mounted
 - **Git** for repository interaction
+- **zstd** for compression (used by the backup system)
 
 ## Available tags
 
